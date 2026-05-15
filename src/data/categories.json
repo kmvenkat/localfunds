@@ -1,0 +1,38 @@
+[
+  {
+    "slug": "education",
+    "label": "Education & Children",
+    "icon": "school",
+    "programs": []
+  },
+  {
+    "slug": "health",
+    "label": "Health & Medicine",
+    "icon": "heart",
+    "programs": []
+  },
+  {
+    "slug": "infrastructure",
+    "label": "Infrastructure & Environment",
+    "icon": "road",
+    "programs": []
+  },
+  {
+    "slug": "food-and-farming",
+    "label": "Food & Farming",
+    "icon": "leaf",
+    "programs": []
+  },
+  {
+    "slug": "housing",
+    "label": "Housing & Community",
+    "icon": "home",
+    "programs": []
+  },
+  {
+    "slug": "community-safety",
+    "label": "Community Safety & Emergency",
+    "icon": "alert",
+    "programs": []
+  }
+]
