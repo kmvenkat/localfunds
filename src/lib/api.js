@@ -162,6 +162,32 @@ async function fetchByGeography(countyFips, cfdaNumbers, programName) {
   return { amount, population }
 }
 
+async function fetchByRecipientLocation(countyFips, cfdaNumbers, programName) {
+  const response = await fetch(USASPENDING_GEOGRAPHY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scope: 'recipient_location',
+      geo_layer: 'county',
+      geo_layer_filters: [countyFips],
+      filters: {
+        program_numbers: cfdaNumbers,
+        time_period: [{ start_date: '2015-01-01', end_date: '2024-12-31' }],
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`USASpending recipient geography: HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+  const amount = data.results?.[0]?.aggregated_amount ?? 0
+  const population = data.results?.[0]?.population ?? null
+  console.log(`[geo-recip] ${programName}: $${amount.toLocaleString()}`)
+  return { amount, population }
+}
+
 async function fetchCountyPopulation(countyFips) {
   try {
     const stateFips = countyFips.slice(0, 2)
@@ -300,6 +326,21 @@ async function fetchGeographyProgram(countyFips, program, cfdaNumbers) {
   }
 }
 
+async function fetchRecipientGeographyProgram(countyFips, program, cfdaNumbers) {
+  try {
+    const { amount, population } = await fetchByRecipientLocation(
+      countyFips,
+      cfdaNumbers,
+      program.name,
+    )
+    program.amount = amount
+    program.population = population ?? null
+    return { program, population }
+  } catch (err) {
+    return { program: failedProgram(program, err.message), population: null }
+  }
+}
+
 async function fetchAgExtensionProgram(countyFips, stateAbbr, countyCode, program) {
   const cfda = ['10.500']
 
@@ -364,10 +405,6 @@ function withDataNote(result, dataNote) {
   return { ...result, dataNote }
 }
 
-function hasZeroAmountProgram(programs) {
-  return programs.some((p) => p.amount === 0)
-}
-
 const DATA_NOTES = {
   education: {
     zero:
@@ -403,7 +440,18 @@ const DATA_NOTES = {
 
 function educationDataNote(total, programs) {
   if (total === 0) return DATA_NOTES.education.zero
-  if (hasZeroAmountProgram(programs)) return DATA_NOTES.education.partial
+  if (total > 0) {
+    const titleI = programs.find((p) => p.id === 'title-i')
+    const idea = programs.find((p) => p.id === 'idea')
+    const schoolLunch = programs.find((p) => p.id === 'school-lunch')
+    if (
+      titleI?.amount === 0 &&
+      idea?.amount === 0 &&
+      schoolLunch?.amount === 0
+    ) {
+      return 'Title I, IDEA, and School Lunch flow through state agencies and may not appear at county level. Pell Grants and Head Start reflect direct recipient data.'
+    }
+  }
   return null
 }
 
@@ -506,78 +554,107 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
 }
 
 export async function fetchEducation(countyFips, stateCode) {
-  const result = await fetchCategory(countyFips, stateCode, [
-    {
-      cfda: ['84.010'],
-      program: baseProgram({
-        id: 'title-i',
-        name: 'Title I',
-        description: 'Funding for schools serving high concentrations of low-income students.',
-        source: 'USASpending.gov — CFDA 84.010 Title I Grants to Local Educational Agencies',
-        geography: 'Attributed to county of the recipient school district.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=84.010',
-      }),
-    },
-    {
-      cfda: ['84.027'],
-      program: baseProgram({
-        id: 'idea',
-        name: 'Special Education (IDEA)',
-        description: 'Grants supporting education for students with disabilities.',
-        source: 'USASpending.gov — CFDA 84.027 Special Education Grants to States',
-        geography: 'Attributed to county of the recipient school district.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=84.027',
-      }),
-    },
-    {
-      cfda: ['10.555'],
-      program: baseProgram({
-        id: 'school-lunch',
-        name: 'School Lunch Program',
-        description: 'Federal reimbursements to schools for free and reduced-price meals.',
-        source: 'USASpending.gov — CFDA 10.555 National School Lunch Program',
-        geography: 'Attributed to county of the recipient school or district.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=10.555',
-      }),
-    },
-    {
-      cfda: ['93.600'],
-      program: baseProgram({
-        id: 'head-start',
-        name: 'Head Start',
-        description: 'Early childhood education, health, and nutrition for low-income children.',
-        source: 'USASpending.gov — CFDA 93.600 Head Start',
-        geography: 'Attributed to county of the recipient organization.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.600',
-      }),
-    },
-    {
-      cfda: ['84.063'],
-      program: baseProgram({
-        id: 'pell-grants',
-        name: 'Pell Grants',
-        description: 'Need-based grants for undergraduate students at colleges in this county.',
-        source: 'USASpending.gov — CFDA 84.063 Federal Pell Grant Program',
-        geography: 'Attributed to county of the recipient institution, not student residence.',
-        limitation:
-          'Reflects grants to institutions located in this county. Students may commute from other counties.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=84.063',
-      }),
-    },
-    {
-      cfda: ['93.767'],
-      program: baseProgram({
-        id: 'chip',
-        name: 'CHIP',
-        description: 'Health insurance coverage for children in low-income families.',
-        source: "USASpending.gov — CFDA 93.767 Children's Health Insurance Program",
-        geography: 'Attributed to county of the administering state agency office.',
-        limitation: 'State-administered program. County attribution is approximate.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.767',
-      }),
-    },
+  const params = resolveCountyParams(countyFips, stateCode)
+  if (!params) {
+    return withDataNote({ total: 0, programs: [] }, DATA_NOTES.education.zero)
+  }
+
+  const titleIProgram = baseProgram({
+    id: 'title-i',
+    name: 'Title I',
+    description: 'Funding for schools serving high concentrations of low-income students.',
+    source: 'USASpending.gov — CFDA 84.010 Title I Grants to Local Educational Agencies',
+    geography: 'Attributed to county of the recipient school district.',
+    sourceUrl: 'https://sam.gov/search?index=cfda&q=84.010',
+  })
+
+  const ideaProgram = baseProgram({
+    id: 'idea',
+    name: 'Special Education (IDEA)',
+    description: 'Grants supporting education for students with disabilities.',
+    source: 'USASpending.gov — CFDA 84.027 Special Education Grants to States',
+    geography: 'Attributed to county of the recipient school district.',
+    sourceUrl: 'https://sam.gov/search?index=cfda&q=84.027',
+  })
+
+  const schoolLunchProgram = baseProgram({
+    id: 'school-lunch',
+    name: 'School Lunch Program',
+    description: 'Federal reimbursements to schools for free and reduced-price meals.',
+    source: 'USASpending.gov — CFDA 10.555 National School Lunch Program',
+    geography: 'Attributed to county of the recipient school or district.',
+    sourceUrl: 'https://sam.gov/search?index=cfda&q=10.555',
+  })
+
+  const headStartProgram = baseProgram({
+    id: 'head-start',
+    name: 'Head Start',
+    description: 'Early childhood education, health, and nutrition for low-income children.',
+    source: 'USASpending.gov — CFDA 93.600 Head Start',
+    geography: 'Attributed to county of the recipient organization.',
+    sourceUrl: 'https://sam.gov/search?index=cfda&q=93.600',
+  })
+
+  const pellProgram = baseProgram({
+    id: 'pell-grants',
+    name: 'Pell Grants',
+    description: 'Need-based grants for undergraduate students at colleges in this county.',
+    source: 'USASpending.gov — CFDA 84.063 Federal Pell Grant Program',
+    geography: 'Attributed to county of the recipient institution, not student residence.',
+    limitation:
+      'Reflects grants to institutions located in this county. Students may commute from other counties.',
+    sourceUrl: 'https://sam.gov/search?index=cfda&q=84.063',
+  })
+
+  const chipProgram = baseProgram({
+    id: 'chip',
+    name: 'CHIP',
+    description: 'Health insurance coverage for children in low-income families.',
+    source: "USASpending.gov — CFDA 93.767 Children's Health Insurance Program",
+    geography: 'Attributed to county of the administering state agency office.',
+    limitation: 'State-administered program. County attribution is approximate.',
+    sourceUrl: 'https://sam.gov/search?index=cfda&q=93.767',
+  })
+
+  const geoResults = await Promise.allSettled([
+    fetchRecipientGeographyProgram(countyFips, titleIProgram, ['84.010']),
+    fetchRecipientGeographyProgram(countyFips, ideaProgram, ['84.027']),
+    fetchRecipientGeographyProgram(countyFips, schoolLunchProgram, ['10.555']),
+    fetchRecipientGeographyProgram(countyFips, headStartProgram, ['93.600']),
+    fetchRecipientGeographyProgram(countyFips, pellProgram, ['84.063']),
+    fetchRecipientGeographyProgram(countyFips, chipProgram, ['93.767']),
   ])
-  return withDataNote(result, educationDataNote(result.total, result.programs))
+
+  const templates = [
+    titleIProgram,
+    ideaProgram,
+    schoolLunchProgram,
+    headStartProgram,
+    pellProgram,
+    chipProgram,
+  ]
+
+  const programs = geoResults.map((result, index) => {
+    if (result.status === 'fulfilled') {
+      return result.value.program
+    }
+    return failedProgram(templates[index], result.reason?.message ?? 'Request failed')
+  })
+
+  const population =
+    titleIProgram.population ??
+    ideaProgram.population ??
+    headStartProgram.population ??
+    pellProgram.population ??
+    null
+
+  const pell = programs.find((p) => p.id === 'pell-grants')
+  if (pell) {
+    pell.population = population
+  }
+
+  const total = sumNumbers(programs.map((p) => p.amount))
+  return withDataNote({ total, programs }, educationDataNote(total, programs))
 }
 
 export async function fetchHealth(countyFips, stateCode) {
