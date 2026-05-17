@@ -1,7 +1,13 @@
 const USASPENDING_AWARDS = 'https://api.usaspending.gov/api/v2/search/spending_by_award/'
 const USASPENDING_GEOGRAPHY = 'https://api.usaspending.gov/api/v2/search/spending_by_geography/'
 
-const VINTAGE = 'Awards from FY2015 through FY2025.'
+const VINTAGE = 'Awards from FY2015 through FY2024.'
+
+const URBAN_FINANCE_SOURCE =
+  'Urban Institute Education Data Portal — CCD District Finance (NCES)'
+
+const URBAN_FINANCE_VINTAGE =
+  'FY2019 (most recent available in Urban Institute CCD Finance dataset).'
 
 const SNAP_ESTIMATED_LIMITATION =
   'County figure estimated from national SNAP participation rates. Actual disbursements are state-administered and not reported at county level by USDA.'
@@ -216,8 +222,10 @@ function buildSnapProgram(population) {
       id: 'snap',
       name: 'SNAP',
       description: 'Nutrition assistance for low-income individuals and families.',
-      source: 'Estimated from national SNAP participation rates (USDA FNS)',
-      geography: 'County-level estimate based on population and national participation rates.',
+      source: 'USDA Food and Nutrition Service — estimated from national participation rates',
+      geography:
+        'Estimated from county population and national SNAP participation and benefit rates. Not a direct federal award figure.',
+      vintage: 'FY2023 participation rates applied to current county population.',
       limitation: SNAP_ESTIMATED_LIMITATION,
       estimated: true,
       sourceUrl: 'https://www.fns.usda.gov/pd/supplemental-nutrition-assistance-program-data',
@@ -240,8 +248,10 @@ function buildWicProgram(population) {
       id: 'wic',
       name: 'WIC',
       description: 'Nutrition support for low-income women, infants, and children.',
-      source: 'Estimated from national WIC participation rates (USDA FNS)',
-      geography: 'County-level estimate based on population and national participation rates.',
+      source: 'USDA Food and Nutrition Service — estimated from national participation rates',
+      geography:
+        'Estimated from county population and national WIC participation and benefit rates. Not a direct federal award figure.',
+      vintage: 'FY2023 participation rates applied to current county population.',
       limitation: WIC_ESTIMATED_LIMITATION,
       estimated: true,
       sourceUrl: 'https://www.fns.usda.gov/pd/wic-program',
@@ -272,6 +282,7 @@ function baseProgram({
   noDataReason = null,
   noDataLink = null,
   noDataLinkLabel = null,
+  vintage = VINTAGE,
 }) {
   return {
     id,
@@ -282,7 +293,7 @@ function baseProgram({
     description,
     source,
     geography,
-    vintage: VINTAGE,
+    vintage,
     limitation,
     population: null,
     sourceUrl,
@@ -349,12 +360,6 @@ async function fetchRecipientGeographyProgram(countyFips, program, cfdaNumbers) 
 
 const URBAN_BASE = 'https://educationdata.urban.org/api/v1'
 
-const DISTRICT_FINANCE_GEOGRAPHY =
-  'Sum of federal revenue reported by school districts in this county (Urban Institute / CCD Finance Data, FY2019).'
-
-const DISTRICT_FINANCE_VINTAGE =
-  'FY2019 (most recent available in Urban Institute Education Data Portal).'
-
 async function fetchDistrictFinance(countyFips) {
   try {
     const stateFips = parseInt(countyFips.slice(0, 2), 10)
@@ -406,14 +411,10 @@ function resolveEducationGeoResult(geoResult, template) {
   }
 }
 
-function applyDistrictFinanceProgram(program, amount, usedDistrictFinance) {
+function applyDistrictFinanceProgram(program, amount) {
   return {
     ...program,
     amount,
-    ...(usedDistrictFinance && {
-      geography: DISTRICT_FINANCE_GEOGRAPHY,
-      vintage: DISTRICT_FINANCE_VINTAGE,
-    }),
   }
 }
 
@@ -571,8 +572,8 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         name: 'Hazard Mitigation Grants',
         description:
           'Federal grants to reduce risk from natural disasters including floods, hurricanes, and wildfires.',
-        source: 'USASpending.gov — CFDA 97.039 Hazard Mitigation Grant Program',
-        geography: 'Funding attributed to county of project location.',
+        source: 'USASpending.gov — CFDA 97.039 Hazard Mitigation Grant',
+        geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=97.039',
         noDataReason:
           'Hazard mitigation grants are project-based and may not have active awards in every county in every period.',
@@ -587,8 +588,8 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         name: 'FEMA Public Assistance',
         description:
           'Reimbursement to local governments for disaster response, debris removal, and infrastructure repair.',
-        source: 'USASpending.gov — CFDA 97.036 FEMA Public Assistance',
-        geography: 'Attributed to county of the applicant organization.',
+        source: 'USASpending.gov — CFDA 97.036 Disaster Grants — Public Assistance',
+        geography: 'Disaster-specific. Only awarded after a presidentially declared disaster.',
         limitation:
           'Covers declared disasters only. Routine emergency management funding tracked separately.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=97.036',
@@ -605,8 +606,8 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         name: 'Byrne JAG Grants',
         description:
           'Federal grants supporting local law enforcement, crime prevention, and criminal justice programs.',
-        source: 'USASpending.gov — CFDA 16.738 Justice Assistance Grants',
-        geography: 'Attributed to county of place of performance.',
+        source: 'USASpending.gov — CFDA 16.738 Edward Byrne Memorial Justice Assistance Grant',
+        geography: 'Attributed to county of the recipient law enforcement agency.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=16.738',
       }),
     },
@@ -617,7 +618,7 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         name: 'Fire Department Grants (AFG)',
         description:
           'Grants to fire departments for equipment, training, and operations to protect communities.',
-        source: 'USASpending.gov — CFDA 97.044 Assistance to Firefighters',
+        source: 'USASpending.gov — CFDA 97.044 Assistance to Firefighters Grant',
         geography: 'Attributed to county of the recipient fire department.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=97.044',
       }),
@@ -629,7 +630,7 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         name: 'Veterans Services Grants',
         description:
           'Grants supporting housing, employment, and community services for veterans.',
-        source: 'USASpending.gov — CFDA 64.024/64.025 Veterans Programs',
+        source: 'USASpending.gov — CFDA 64.024 Veterans State Domiciliary Care',
         geography: 'Attributed to county of the recipient organization.',
         limitation:
           'Does not include VA healthcare or disability payments tracked separately.',
@@ -650,8 +651,9 @@ export async function fetchEducation(countyFips, stateCode) {
     id: 'title-i',
     name: 'Title I',
     description: 'Funding for schools serving high concentrations of low-income students.',
-    source: 'USASpending.gov — CFDA 84.010 Title I Grants to Local Educational Agencies',
-    geography: 'Attributed to county of the recipient school district.',
+    source: URBAN_FINANCE_SOURCE,
+    geography: 'Sum of federal Title I revenue reported by all school districts in this county.',
+    vintage: URBAN_FINANCE_VINTAGE,
     sourceUrl: 'https://sam.gov/search?index=cfda&q=84.010',
     noDataReason:
       'Title I grants flow through the Texas Education Agency (TEA), a state agency. USASpending tracks the award to the state, not to individual counties or districts.',
@@ -664,8 +666,9 @@ export async function fetchEducation(countyFips, stateCode) {
     id: 'idea',
     name: 'Special Education (IDEA)',
     description: 'Grants supporting education for students with disabilities.',
-    source: 'USASpending.gov — CFDA 84.027 Special Education Grants to States',
-    geography: 'Attributed to county of the recipient school district.',
+    source: URBAN_FINANCE_SOURCE,
+    geography: 'Sum of federal IDEA revenue reported by all school districts in this county.',
+    vintage: URBAN_FINANCE_VINTAGE,
     sourceUrl: 'https://sam.gov/search?index=cfda&q=84.027',
     noDataReason:
       "IDEA grants are administered by TEA and distributed to school districts. County-level data isn't tracked in federal spending systems.",
@@ -677,8 +680,10 @@ export async function fetchEducation(countyFips, stateCode) {
     id: 'school-lunch',
     name: 'School Lunch Program',
     description: 'Federal reimbursements to schools for free and reduced-price meals.',
-    source: 'USASpending.gov — CFDA 10.555 National School Lunch Program',
-    geography: 'Attributed to county of the recipient school or district.',
+    source: URBAN_FINANCE_SOURCE,
+    geography:
+      'Sum of federal child nutrition revenue reported by all school districts in this county.',
+    vintage: URBAN_FINANCE_VINTAGE,
     sourceUrl: 'https://sam.gov/search?index=cfda&q=10.555',
     noDataReason:
       "School lunch reimbursements flow through TEA to individual school districts. USASpending doesn't capture county-level disbursements.",
@@ -700,7 +705,7 @@ export async function fetchEducation(countyFips, stateCode) {
     name: 'Pell Grants',
     description: 'Need-based grants for undergraduate students at colleges in this county.',
     source: 'USASpending.gov — CFDA 84.063 Federal Pell Grant Program',
-    geography: 'Attributed to county of the recipient institution, not student residence.',
+    geography: 'Attributed to county of the recipient institution.',
     limitation:
       'Reflects grants to institutions located in this county. Students may commute from other counties.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=84.063',
@@ -711,7 +716,7 @@ export async function fetchEducation(countyFips, stateCode) {
     name: 'CHIP',
     description: 'Health insurance coverage for children in low-income families.',
     source: "USASpending.gov — CFDA 93.767 Children's Health Insurance Program",
-    geography: 'Attributed to county of the administering state agency office.',
+    geography: 'Attributed to county of the recipient organization.',
     limitation: 'State-administered program. County attribution is approximate.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=93.767',
   })
@@ -796,7 +801,8 @@ export async function fetchHealth(countyFips, stateCode) {
         description:
           'Federal-state health insurance for low-income individuals and families.',
         source: 'USASpending.gov — CFDA 93.778 Medical Assistance Program',
-        geography: 'Attributed to county of the administering state Medicaid agency.',
+        geography:
+          'Attributed to county of the administering state Medicaid agency. County attribution is approximate.',
         limitation: 'State-administered program. County attribution is approximate.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.778',
         noDataReason:
@@ -812,8 +818,8 @@ export async function fetchHealth(countyFips, stateCode) {
         id: 'rural-health',
         name: 'Rural Health Grants',
         description: 'Grants supporting healthcare access and workforce in rural communities.',
-        source: 'USASpending.gov — CFDA 93.912 Rural Health Care Services Outreach',
-        geography: 'Attributed to county of the recipient healthcare organization.',
+        source: 'USASpending.gov — CFDA 93.912 Rural Health Care Services',
+        geography: 'Attributed to county of the recipient organization.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.912',
         noDataReason:
           'Rural health grants are administered through state offices and may not appear at county level for urban counties like this one.',
@@ -828,7 +834,7 @@ export async function fetchHealth(countyFips, stateCode) {
         name: 'Community Health Centers',
         description: 'Funding for community health centers serving underserved populations.',
         source: 'USASpending.gov — CFDA 93.224 Community Health Centers',
-        geography: 'Attributed to county of the health center location.',
+        geography: 'Attributed to county of the recipient health center.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.224',
       }),
     },
@@ -838,8 +844,10 @@ export async function fetchHealth(countyFips, stateCode) {
         id: 'va-healthcare',
         name: 'VA Healthcare',
         description: 'Veterans healthcare services and facility operations in this county.',
-        source: 'USASpending.gov — CFDA 64.009 Veterans Medical Care Benefits',
-        geography: 'Attributed to county of the VA facility or service area.',
+        source: 'Department of Veterans Affairs — not tracked in USASpending',
+        geography:
+          'VA operates through its own facility network and does not report to USASpending.',
+        vintage: 'N/A',
         limitation: 'Includes facility-based care. Not all veteran residents are served locally.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=64.009',
         noDataReason:
@@ -855,7 +863,7 @@ export async function fetchHealth(countyFips, stateCode) {
         name: 'Mental Health Services',
         description: 'Grants for community mental health services and treatment programs.',
         source: 'USASpending.gov — CFDA 93.958 Block Grants for Community Mental Health',
-        geography: 'Attributed to county of the recipient service provider.',
+        geography: 'Attributed to county of the recipient organization.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.958',
       }),
     },
@@ -865,8 +873,8 @@ export async function fetchHealth(countyFips, stateCode) {
         id: 'substance-abuse',
         name: 'Substance Abuse Treatment',
         description: 'Grants for substance abuse prevention and treatment services.',
-        source: 'USASpending.gov — CFDA 93.959 Block Grants for Substance Abuse Prevention',
-        geography: 'Attributed to county of the recipient treatment provider.',
+        source: 'USASpending.gov — CFDA 93.959 Block Grants for Prevention and Treatment',
+        geography: 'Attributed to county of the recipient organization.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.959',
         noDataReason:
           "Substance abuse treatment grants are administered by SAMHSA through state behavioral health agencies. County-level data isn't tracked in USASpending.",
@@ -899,8 +907,8 @@ export async function fetchInfrastructure(countyFips, stateCode) {
         id: 'transit',
         name: 'Transit Grants',
         description: 'Federal grants for public transit systems, buses, and rail.',
-        source: 'USASpending.gov — CFDA 20.507 Federal Transit Formula Grants',
-        geography: 'Attributed to county of the recipient transit authority.',
+        source: 'USASpending.gov — CFDA 20.507 Formula Grants for Rural Areas',
+        geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=20.507',
       }),
     },
@@ -910,7 +918,7 @@ export async function fetchInfrastructure(countyFips, stateCode) {
         id: 'broadband',
         name: 'Broadband Infrastructure',
         description: 'Grants to expand high-speed internet access in underserved areas.',
-        source: 'USASpending.gov — CFDA 10.888 Broadband ReConnect Program',
+        source: 'USASpending.gov — CFDA 10.888 Rural Broadband Access',
         geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=10.888',
       }),
@@ -922,7 +930,7 @@ export async function fetchInfrastructure(countyFips, stateCode) {
         name: 'Water and Wastewater',
         description: 'Grants for drinking water and wastewater infrastructure improvements.',
         source: 'USASpending.gov — CFDA 66.458 Capitalization Grants for Clean Water',
-        geography: 'Attributed to county of the recipient utility or municipality.',
+        geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=66.458',
       }),
     },
@@ -932,7 +940,7 @@ export async function fetchInfrastructure(countyFips, stateCode) {
         id: 'epa-clean-water',
         name: 'EPA Clean Water Grants',
         description: 'EPA grants to protect and restore local waterways and ecosystems.',
-        source: 'USASpending.gov — CFDA 66.460 Nonpoint Source Implementation Grants',
+        source: 'USASpending.gov — CFDA 66.460 Clean Water State Revolving Fund',
         geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=66.460',
       }),
@@ -944,7 +952,7 @@ export async function fetchInfrastructure(countyFips, stateCode) {
         name: 'Environmental Remediation',
         description: 'Funding to clean up contaminated sites and protect community health.',
         source: 'USASpending.gov — CFDA 66.802 Superfund State and Indian Tribe Core Program',
-        geography: 'Attributed to county of the remediation site.',
+        geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=66.802',
       }),
     },
@@ -968,7 +976,7 @@ export async function fetchFoodAndFarming(countyFips, stateCode) {
     name: 'Farm Operating Loans',
     description: 'USDA loans and grants supporting farm operations and family farmers.',
     source: 'USASpending.gov — CFDA 10.406 Farm Operating Loans',
-    geography: 'Attributed to county of the recipient farm operation.',
+    geography: 'Attributed to county of place of performance.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=10.406',
   })
 
@@ -977,7 +985,7 @@ export async function fetchFoodAndFarming(countyFips, stateCode) {
     name: 'Agricultural Extension',
     description: 'USDA funding for university extension programs supporting local farmers.',
     source: 'USASpending.gov — CFDA 10.500 Cooperative Extension Service',
-    geography: 'Attributed to county of the recipient university or extension office.',
+    geography: 'Attributed to county of place of performance.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=10.500',
   })
 
@@ -985,9 +993,9 @@ export async function fetchFoodAndFarming(countyFips, stateCode) {
     id: 'crop-insurance',
     name: 'Crop Insurance',
     description: 'Federal support for crop insurance protecting farmers from weather losses.',
-    source:
-      'USASpending.gov — CFDA 10.450 Crop Insurance and 10.195 Consolidated Farm and Rural Development',
-    geography: 'Attributed to county of the insured farm operation.',
+    source: 'USDA Risk Management Agency — Summary of Business data',
+    geography: 'Reported at county level by USDA RMA.',
+    vintage: 'Most recent available RMA Summary of Business data.',
     sourceUrl: 'https://www.rma.usda.gov/en/Information-Tools/Summary-of-Business',
   })
 
@@ -1033,7 +1041,7 @@ export async function fetchHousing(countyFips, stateCode) {
         description:
           'Flexible federal grants for community development, housing, and local improvements.',
         source: 'USASpending.gov — CFDA 14.218 Community Development Block Grants',
-        geography: 'Attributed to county of the recipient municipality or county government.',
+        geography: 'Attributed to county of the recipient jurisdiction.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=14.218',
       }),
     },
@@ -1066,7 +1074,7 @@ export async function fetchHousing(countyFips, stateCode) {
         name: 'Homeless Assistance',
         description: 'Grants supporting shelters, transitional housing, and homeless services.',
         source: 'USASpending.gov — CFDA 14.231 Emergency Solutions Grants',
-        geography: 'Attributed to county of the Continuum of Care lead agency.',
+        geography: 'Attributed to county of the recipient organization.',
         limitation:
           'CoC service areas may cross county lines. Funding may serve residents of neighboring counties.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=14.231',
@@ -1079,7 +1087,7 @@ export async function fetchHousing(countyFips, stateCode) {
         name: 'Rural Housing',
         description: 'USDA loans and grants for housing in rural areas.',
         source: 'USASpending.gov — CFDA 10.415 Rural Rental Housing Loans',
-        geography: 'Attributed to county of the housing project location.',
+        geography: 'Attributed to county of place of performance.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=10.415',
       }),
     },
