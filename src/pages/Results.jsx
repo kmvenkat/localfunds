@@ -237,54 +237,113 @@ export default function Results() {
               ✕
             </button>
             <div className="p-7">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
-                How we calculate this
-              </p>
-              <h3 id="methodology-title" className="mb-5 text-xl font-bold text-ink">
-                {modalProgram.name}
-              </h3>
-
-              <div className="mb-4">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
-                  Source
-                </p>
-                <p className="text-sm leading-relaxed text-ink">{modalProgram.source}</p>
-              </div>
-
-              <div className="mb-4">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
-                  Geography
-                </p>
-                <p className="text-sm leading-relaxed text-ink">{modalProgram.geography}</p>
-              </div>
-
-              <div className="mb-4">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
-                  Years covered
-                </p>
-                <p className="text-sm leading-relaxed text-ink">{modalProgram.vintage}</p>
-              </div>
-
-              {modalProgram.limitation && (
-                <div className="mb-4">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
-                    Limitation
+              {modalProgram.amount === 0 && modalProgram.noDataReason ? (
+                <>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
+                    Why no data?
                   </p>
-                  <p className="text-sm leading-relaxed text-ink">{modalProgram.limitation}</p>
-                </div>
-              )}
+                  <h3 id="methodology-title" className="mb-5 text-xl font-bold text-ink">
+                    {modalProgram.name}
+                  </h3>
 
-              {modalProgram.sourceUrl && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <a
-                    href={modalProgram.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-accent hover:underline"
-                  >
-                    View source data →
-                  </a>
-                </div>
+                  <div className="mb-4">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+                      Why it shows $0
+                    </p>
+                    <p className="text-sm leading-relaxed text-ink">
+                      {modalProgram.noDataReason}
+                    </p>
+                  </div>
+
+                  {modalProgram.noDataLink && (
+                    <div className="mb-4">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+                        Where to find this data
+                      </p>
+                      <p className="text-sm leading-relaxed text-ink">
+                        This program&apos;s data is published by the administering agency.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-4 border-t border-border pt-4">
+                    {modalProgram.noDataLink ? (
+                      <a
+                        href={modalProgram.noDataLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-accent hover:underline"
+                      >
+                        {modalProgram.noDataLinkLabel}
+                      </a>
+                    ) : (
+                      modalProgram.sourceUrl && (
+                        <a
+                          href={modalProgram.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-accent hover:underline"
+                        >
+                          View source data →
+                        </a>
+                      )
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
+                    How we calculate this
+                  </p>
+                  <h3 id="methodology-title" className="mb-5 text-xl font-bold text-ink">
+                    {modalProgram.name}
+                  </h3>
+
+                  <div className="mb-4">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+                      Source
+                    </p>
+                    <p className="text-sm leading-relaxed text-ink">{modalProgram.source}</p>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+                      Geography
+                    </p>
+                    <p className="text-sm leading-relaxed text-ink">{modalProgram.geography}</p>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+                      Years covered
+                    </p>
+                    <p className="text-sm leading-relaxed text-ink">{modalProgram.vintage}</p>
+                  </div>
+
+                  {modalProgram.limitation && (
+                    <div className="mb-4">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+                        Limitation
+                      </p>
+                      <p className="text-sm leading-relaxed text-ink">
+                        {modalProgram.limitation}
+                      </p>
+                    </div>
+                  )}
+
+                  {modalProgram.sourceUrl && (
+                    <div className="mt-5 border-t border-border pt-4">
+                      <a
+                        href={modalProgram.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-accent hover:underline"
+                      >
+                        View source data →
+                      </a>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

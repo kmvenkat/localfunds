@@ -269,6 +269,9 @@ function baseProgram({
   limitation = null,
   estimated = false,
   sourceUrl,
+  noDataReason = null,
+  noDataLink = null,
+  noDataLinkLabel = null,
 }) {
   return {
     id,
@@ -283,6 +286,9 @@ function baseProgram({
     limitation,
     population: null,
     sourceUrl,
+    noDataReason,
+    noDataLink,
+    noDataLinkLabel,
   }
 }
 
@@ -495,6 +501,10 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         source: 'USASpending.gov — CFDA 97.039 Hazard Mitigation Grant Program',
         geography: 'Funding attributed to county of project location.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=97.039',
+        noDataReason:
+          'Hazard mitigation grants are project-based and may not have active awards in every county in every period.',
+        noDataLink: 'https://www.fema.gov/grants/mitigation',
+        noDataLinkLabel: 'Find FEMA mitigation grants at fema.gov →',
       }),
     },
     {
@@ -509,6 +519,10 @@ export async function fetchCommunitySafety(countyFips, stateCode) {
         limitation:
           'Covers declared disasters only. Routine emergency management funding tracked separately.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=97.036',
+        noDataReason:
+          'FEMA Public Assistance is disaster-specific. Counties only receive this funding after a presidentially declared disaster.',
+        noDataLink: 'https://www.fema.gov/assistance/public',
+        noDataLinkLabel: 'Find FEMA Public Assistance data at fema.gov →',
       }),
     },
     {
@@ -566,6 +580,11 @@ export async function fetchEducation(countyFips, stateCode) {
     source: 'USASpending.gov — CFDA 84.010 Title I Grants to Local Educational Agencies',
     geography: 'Attributed to county of the recipient school district.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=84.010',
+    noDataReason:
+      'Title I grants flow through the Texas Education Agency (TEA), a state agency. USASpending tracks the award to the state, not to individual counties or districts.',
+    noDataLink:
+      'https://tea.texas.gov/finance-and-grants/grants/grants-administration/applying-for-a-grant',
+    noDataLinkLabel: 'Find Title I data at tea.texas.gov →',
   })
 
   const ideaProgram = baseProgram({
@@ -575,6 +594,10 @@ export async function fetchEducation(countyFips, stateCode) {
     source: 'USASpending.gov — CFDA 84.027 Special Education Grants to States',
     geography: 'Attributed to county of the recipient school district.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=84.027',
+    noDataReason:
+      "IDEA grants are administered by TEA and distributed to school districts. County-level data isn't tracked in federal spending systems.",
+    noDataLink: 'https://tea.texas.gov/academics/special-student-populations/special-education',
+    noDataLinkLabel: 'Find IDEA data at tea.texas.gov →',
   })
 
   const schoolLunchProgram = baseProgram({
@@ -584,6 +607,10 @@ export async function fetchEducation(countyFips, stateCode) {
     source: 'USASpending.gov — CFDA 10.555 National School Lunch Program',
     geography: 'Attributed to county of the recipient school or district.',
     sourceUrl: 'https://sam.gov/search?index=cfda&q=10.555',
+    noDataReason:
+      "School lunch reimbursements flow through TEA to individual school districts. USASpending doesn't capture county-level disbursements.",
+    noDataLink: 'https://www.fns.usda.gov/nslp',
+    noDataLinkLabel: 'Find School Lunch data at fns.usda.gov →',
   })
 
   const headStartProgram = baseProgram({
@@ -670,6 +697,11 @@ export async function fetchHealth(countyFips, stateCode) {
         geography: 'Attributed to county of the administering state Medicaid agency.',
         limitation: 'State-administered program. County attribution is approximate.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.778',
+        noDataReason:
+          'Medicaid is jointly funded federally and by states. Payments flow through Texas HHSC — a state agency — not to individual counties. USASpending tracks the state-level award only.',
+        noDataLink:
+          'https://www.medicaid.gov/medicaid/financial-management/medicaid-expenditure-analysis/index.html',
+        noDataLinkLabel: 'Find Medicaid expenditure data at medicaid.gov →',
       }),
     },
     {
@@ -681,6 +713,10 @@ export async function fetchHealth(countyFips, stateCode) {
         source: 'USASpending.gov — CFDA 93.912 Rural Health Care Services Outreach',
         geography: 'Attributed to county of the recipient healthcare organization.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.912',
+        noDataReason:
+          'Rural health grants are administered through state offices and may not appear at county level for urban counties like this one.',
+        noDataLink: 'https://www.hrsa.gov/rural-health',
+        noDataLinkLabel: 'Find rural health data at hrsa.gov →',
       }),
     },
     {
@@ -704,6 +740,10 @@ export async function fetchHealth(countyFips, stateCode) {
         geography: 'Attributed to county of the VA facility or service area.',
         limitation: 'Includes facility-based care. Not all veteran residents are served locally.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=64.009',
+        noDataReason:
+          "VA healthcare runs through the Department of Veterans Affairs' own facility network, not through USASpending award grants. VA expenditure data is published separately.",
+        noDataLink: 'https://www.va.gov/directory/guide/home.asp',
+        noDataLinkLabel: 'Find VA facilities and data at va.gov →',
       }),
     },
     {
@@ -726,6 +766,10 @@ export async function fetchHealth(countyFips, stateCode) {
         source: 'USASpending.gov — CFDA 93.959 Block Grants for Substance Abuse Prevention',
         geography: 'Attributed to county of the recipient treatment provider.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.959',
+        noDataReason:
+          "Substance abuse treatment grants are administered by SAMHSA through state behavioral health agencies. County-level data isn't tracked in USASpending.",
+        noDataLink: 'https://www.samhsa.gov/data/',
+        noDataLinkLabel: 'Find behavioral health data at samhsa.gov →',
       }),
     },
   ])

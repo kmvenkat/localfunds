@@ -75,6 +75,8 @@ function ExpandedProgramRow({ program, index, onOpenModal }) {
   const amountColor = program.estimated
     ? 'italic text-ink-light'
     : 'font-semibold text-accent'
+  const showWhyNoData = program.amount === 0 && program.noDataReason
+  const methodologyLabel = showWhyNoData ? 'Why no data?' : 'How we calculate this'
 
   return (
     <div
@@ -100,9 +102,9 @@ function ExpandedProgramRow({ program, index, onOpenModal }) {
               e.stopPropagation()
               onOpenModal(program)
             }}
-            className="mt-1 hidden text-[10px] text-accent hover:underline sm:block"
+            className="mt-1 hidden text-[10px] font-medium text-accent hover:underline sm:block"
           >
-            How we calculate this
+            {methodologyLabel}
           </button>
         </FixedAmountColumn>
       </div>
