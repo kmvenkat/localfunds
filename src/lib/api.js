@@ -347,6 +347,76 @@ async function fetchRecipientGeographyProgram(countyFips, program, cfdaNumbers) 
   }
 }
 
+const URBAN_BASE = 'https://educationdata.urban.org/api/v1'
+
+const DISTRICT_FINANCE_GEOGRAPHY =
+  'Sum of federal revenue reported by school districts in this county (Urban Institute / CCD Finance Data, FY2019).'
+
+const DISTRICT_FINANCE_VINTAGE =
+  'FY2019 (most recent available in Urban Institute Education Data Portal).'
+
+async function fetchDistrictFinance(countyFips) {
+  try {
+    const stateFips = parseInt(countyFips.slice(0, 2), 10)
+
+    const dirUrl = `${URBAN_BASE}/school-districts/ccd/directory/2021/?fips=${stateFips}&per_page=2000`
+    const dirRes = await fetch(dirUrl)
+    if (!dirRes.ok) throw new Error(`Urban directory: ${dirRes.status}`)
+    const dirData = await dirRes.json()
+
+    const countyDistricts = (dirData.results ?? []).filter(
+      (r) => String(r.county_code) === String(countyFips),
+    )
+
+    console.log(`[urban] ${countyDistricts.length} districts in county ${countyFips}`)
+
+    if (countyDistricts.length === 0) return { titleI: 0, idea: 0, schoolLunch: 0 }
+
+    const leaids = countyDistricts.map((r) => r.leaid).filter(Boolean)
+
+    const financePromises = leaids.slice(0, 100).map((leaid) =>
+      fetch(`${URBAN_BASE}/school-districts/ccd/finance/2019/?leaid=${leaid}`)
+        .then((r) => (r.ok ? r.json() : { results: [] }))
+        .then((d) => d.results?.[0] ?? {})
+        .catch(() => ({})),
+    )
+    const financeResults = await Promise.all(financePromises)
+
+    const titleI = financeResults.reduce((sum, r) => sum + (r.rev_fed_state_title_i ?? 0), 0)
+    const idea = financeResults.reduce((sum, r) => sum + (r.rev_fed_state_idea ?? 0), 0)
+    const schoolLunch = financeResults.reduce((sum, r) => sum + (r.rev_fed_child_nutrition_act ?? 0), 0)
+
+    console.log(
+      `[urban] Title I: $${Math.round(titleI / 1e6)}M IDEA: $${Math.round(idea / 1e6)}M Lunch: $${Math.round(schoolLunch / 1e6)}M`,
+    )
+    return { titleI, idea, schoolLunch }
+  } catch (e) {
+    console.warn('[urban] fetchDistrictFinance failed:', e.message)
+    return { titleI: 0, idea: 0, schoolLunch: 0 }
+  }
+}
+
+function resolveEducationGeoResult(geoResult, template) {
+  if (geoResult.status === 'fulfilled') {
+    return geoResult.value
+  }
+  return {
+    program: failedProgram(template, geoResult.reason?.message ?? 'Request failed'),
+    population: null,
+  }
+}
+
+function applyDistrictFinanceProgram(program, amount, usedDistrictFinance) {
+  return {
+    ...program,
+    amount,
+    ...(usedDistrictFinance && {
+      geography: DISTRICT_FINANCE_GEOGRAPHY,
+      vintage: DISTRICT_FINANCE_VINTAGE,
+    }),
+  }
+}
+
 async function fetchAgExtensionProgram(countyFips, stateAbbr, countyCode, program) {
   const cfda = ['10.500']
 
@@ -444,8 +514,11 @@ const DATA_NOTES = {
   },
 }
 
-function educationDataNote(total, programs) {
+function educationDataNote(total, programs, hasDistrictFinance = false) {
   if (total === 0) return DATA_NOTES.education.zero
+  if (hasDistrictFinance) {
+    return 'Title I, IDEA, and School Lunch figures reflect district finance reports via the Urban Institute Education Data Portal (FY2019). Head Start and Pell Grant figures reflect direct federal awards.'
+  }
   if (total > 0) {
     const titleI = programs.find((p) => p.id === 'title-i')
     const idea = programs.find((p) => p.id === 'idea')
@@ -643,15 +716,6 @@ export async function fetchEducation(countyFips, stateCode) {
     sourceUrl: 'https://sam.gov/search?index=cfda&q=93.767',
   })
 
-  const geoResults = await Promise.allSettled([
-    fetchRecipientGeographyProgram(countyFips, titleIProgram, ['84.010']),
-    fetchRecipientGeographyProgram(countyFips, ideaProgram, ['84.027']),
-    fetchRecipientGeographyProgram(countyFips, schoolLunchProgram, ['10.555']),
-    fetchRecipientGeographyProgram(countyFips, headStartProgram, ['93.600']),
-    fetchRecipientGeographyProgram(countyFips, pellProgram, ['84.063']),
-    fetchRecipientGeographyProgram(countyFips, chipProgram, ['93.767']),
-  ])
-
   const templates = [
     titleIProgram,
     ideaProgram,
@@ -661,18 +725,46 @@ export async function fetchEducation(countyFips, stateCode) {
     chipProgram,
   ]
 
-  const programs = geoResults.map((result, index) => {
-    if (result.status === 'fulfilled') {
-      return result.value.program
-    }
-    return failedProgram(templates[index], result.reason?.message ?? 'Request failed')
-  })
+  const [geoResults, districtFinance] = await Promise.all([
+    Promise.allSettled([
+      fetchRecipientGeographyProgram(countyFips, titleIProgram, ['84.010']),
+      fetchRecipientGeographyProgram(countyFips, ideaProgram, ['84.027']),
+      fetchRecipientGeographyProgram(countyFips, schoolLunchProgram, ['10.555']),
+      fetchRecipientGeographyProgram(countyFips, headStartProgram, ['93.600']),
+      fetchRecipientGeographyProgram(countyFips, pellProgram, ['84.063']),
+      fetchRecipientGeographyProgram(countyFips, chipProgram, ['93.767']),
+    ]),
+    fetchDistrictFinance(countyFips),
+  ])
+
+  const [titleIGeo, ideaGeo, schoolLunchGeo, headStartGeo, pellGeo, chipGeo] = geoResults.map(
+    (result, index) => resolveEducationGeoResult(result, templates[index]),
+  )
+
+  const titleIAmount =
+    districtFinance.titleI > 0 ? districtFinance.titleI : titleIGeo.program.amount
+  const ideaAmount = districtFinance.idea > 0 ? districtFinance.idea : ideaGeo.program.amount
+  const schoolLunchAmount =
+    districtFinance.schoolLunch > 0 ? districtFinance.schoolLunch : schoolLunchGeo.program.amount
+
+  const programs = [
+    applyDistrictFinanceProgram(titleIGeo.program, titleIAmount, districtFinance.titleI > 0),
+    applyDistrictFinanceProgram(ideaGeo.program, ideaAmount, districtFinance.idea > 0),
+    applyDistrictFinanceProgram(
+      schoolLunchGeo.program,
+      schoolLunchAmount,
+      districtFinance.schoolLunch > 0,
+    ),
+    headStartGeo.program,
+    pellGeo.program,
+    chipGeo.program,
+  ]
 
   const population =
-    titleIProgram.population ??
-    ideaProgram.population ??
-    headStartProgram.population ??
-    pellProgram.population ??
+    titleIGeo.population ??
+    ideaGeo.population ??
+    headStartGeo.population ??
+    pellGeo.population ??
     null
 
   const pell = programs.find((p) => p.id === 'pell-grants')
@@ -680,8 +772,14 @@ export async function fetchEducation(countyFips, stateCode) {
     pell.population = population
   }
 
+  const hasDistrictFinance =
+    districtFinance.titleI > 0 || districtFinance.idea > 0 || districtFinance.schoolLunch > 0
+
   const total = sumNumbers(programs.map((p) => p.amount))
-  return withDataNote({ total, programs }, educationDataNote(total, programs))
+  return withDataNote(
+    { total, programs },
+    educationDataNote(total, programs, hasDistrictFinance),
+  )
 }
 
 export async function fetchHealth(countyFips, stateCode) {
