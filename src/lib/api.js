@@ -747,6 +747,10 @@ export async function fetchEducation(countyFips, stateCode) {
   const schoolLunchAmount =
     districtFinance.schoolLunch > 0 ? districtFinance.schoolLunch : schoolLunchGeo.program.amount
 
+  const headStart = headStartGeo.program
+  const pellGrants = pellGeo.program
+  const chip = chipGeo.program
+
   const programs = [
     applyDistrictFinanceProgram(titleIGeo.program, titleIAmount, districtFinance.titleI > 0),
     applyDistrictFinanceProgram(ideaGeo.program, ideaAmount, districtFinance.idea > 0),
@@ -755,9 +759,9 @@ export async function fetchEducation(countyFips, stateCode) {
       schoolLunchAmount,
       districtFinance.schoolLunch > 0,
     ),
-    headStartGeo.program,
-    pellGeo.program,
-    chipGeo.program,
+    { ...headStart, amount: headStart.amount },
+    { ...pellGrants, amount: pellGrants.amount },
+    { ...chip, amount: chip.amount },
   ]
 
   const population =
