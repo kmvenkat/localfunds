@@ -535,13 +535,6 @@ function educationDataNote(total, programs, hasDistrictFinance = false) {
   return null
 }
 
-function healthDataNote(total, programs) {
-  if (total === 0) return DATA_NOTES.health.zero
-  const medicaid = programs.find((p) => p.id === 'medicaid')
-  if (total > 0 && medicaid?.amount === 0) return DATA_NOTES.health.medicaid
-  return null
-}
-
 function infrastructureDataNote(total) {
   if (total === 0) return DATA_NOTES.infrastructure.zero
   return null
@@ -791,74 +784,71 @@ export async function fetchEducation(countyFips, stateCode) {
   )
 }
 
+const HEALTH_DATA_NOTE =
+  'Shows direct federal grants to local health organizations only. State-administered programs like Medicaid and VA Healthcare are not included.'
+
 export async function fetchHealth(countyFips, stateCode) {
-  const result = await fetchCategory(countyFips, stateCode, [
+  if (!resolveCountyParams(countyFips, stateCode)) {
+    return withDataNote({ total: 0, programs: [] }, HEALTH_DATA_NOTE)
+  }
+
+  const [
+    communityHealth,
+    ryanWhite,
+    immunization,
+    mentalHealth,
+    tbPrevention,
+    healthyStart,
+  ] = await Promise.all([
+    fetchByRecipientLocation(countyFips, ['93.224'], 'Community Health Centers'),
+    fetchByRecipientLocation(countyFips, ['93.914'], 'Ryan White HIV/AIDS Program'),
+    fetchByRecipientLocation(countyFips, ['93.268'], 'Immunization Grants'),
+    fetchByRecipientLocation(countyFips, ['93.958'], 'Mental Health Services'),
+    fetchByRecipientLocation(countyFips, ['93.116'], 'TB Prevention'),
+    fetchByRecipientLocation(countyFips, ['93.926'], 'Healthy Start'),
+  ])
+
+  const programs = [
     {
-      cfda: ['93.778'],
-      program: baseProgram({
-        id: 'medicaid',
-        name: 'Medicaid',
-        description:
-          'Federal-state health insurance for low-income individuals and families.',
-        source: 'USASpending.gov — CFDA 93.778 Medical Assistance Program',
-        geography:
-          'Attributed to county of the administering state Medicaid agency. County attribution is approximate.',
-        limitation: 'State-administered program. County attribution is approximate.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.778',
-        noDataReason:
-          'Medicaid is jointly funded federally and by states. Payments flow through Texas HHSC — a state agency — not to individual counties. USASpending tracks the state-level award only.',
-        noDataLink:
-          'https://www.medicaid.gov/medicaid/financial-management/medicaid-expenditure-analysis/index.html',
-        noDataLinkLabel: 'Find Medicaid expenditure data at medicaid.gov →',
-      }),
-    },
-    {
-      cfda: ['93.912'],
-      program: baseProgram({
-        id: 'rural-health',
-        name: 'Rural Health Grants',
-        description: 'Grants supporting healthcare access and workforce in rural communities.',
-        source: 'USASpending.gov — CFDA 93.912 Rural Health Care Services',
-        geography: 'Attributed to county of the recipient organization.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.912',
-        noDataReason:
-          'Rural health grants are administered through state offices and may not appear at county level for urban counties like this one.',
-        noDataLink: 'https://www.hrsa.gov/rural-health',
-        noDataLinkLabel: 'Find rural health data at hrsa.gov →',
-      }),
-    },
-    {
-      cfda: ['93.224'],
-      program: baseProgram({
-        id: 'community-health-centers',
+      ...baseProgram({
+        id: 'community-health',
         name: 'Community Health Centers',
-        description: 'Funding for community health centers serving underserved populations.',
+        description:
+          'Funding for federally qualified health centers serving underserved populations.',
         source: 'USASpending.gov — CFDA 93.224 Community Health Centers',
         geography: 'Attributed to county of the recipient health center.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.224',
       }),
+      amount: communityHealth.amount,
+      population: communityHealth.population ?? null,
     },
     {
-      cfda: ['64.009'],
-      program: baseProgram({
-        id: 'va-healthcare',
-        name: 'VA Healthcare',
-        description: 'Veterans healthcare services and facility operations in this county.',
-        source: 'Department of Veterans Affairs — not tracked in USASpending',
-        geography:
-          'VA operates through its own facility network and does not report to USASpending.',
-        vintage: 'N/A',
-        limitation: 'Includes facility-based care. Not all veteran residents are served locally.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=64.009',
-        noDataReason:
-          "VA healthcare runs through the Department of Veterans Affairs' own facility network, not through USASpending award grants. VA expenditure data is published separately.",
-        noDataLink: 'https://www.va.gov/directory/guide/home.asp',
-        noDataLinkLabel: 'Find VA facilities and data at va.gov →',
+      ...baseProgram({
+        id: 'ryan-white',
+        name: 'Ryan White HIV/AIDS Program',
+        description:
+          'Federal grants to local organizations providing HIV/AIDS care, treatment, and support services.',
+        source: 'USASpending.gov — CFDA 93.914 HIV Care Formula Grants',
+        geography: 'Attributed to county of the recipient organization.',
+        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.914',
       }),
+      amount: ryanWhite.amount,
+      population: ryanWhite.population ?? null,
     },
     {
-      cfda: ['93.958'],
-      program: baseProgram({
+      ...baseProgram({
+        id: 'immunization',
+        name: 'Immunization Grants',
+        description: 'Federal funding for local immunization programs and vaccine distribution.',
+        source: 'USASpending.gov — CFDA 93.268 Immunization Cooperative Agreements',
+        geography: 'Attributed to county of the recipient organization.',
+        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.268',
+      }),
+      amount: immunization.amount,
+      population: immunization.population ?? null,
+    },
+    {
+      ...baseProgram({
         id: 'mental-health',
         name: 'Mental Health Services',
         description: 'Grants for community mental health services and treatment programs.',
@@ -866,24 +856,42 @@ export async function fetchHealth(countyFips, stateCode) {
         geography: 'Attributed to county of the recipient organization.',
         sourceUrl: 'https://sam.gov/search?index=cfda&q=93.958',
       }),
+      amount: mentalHealth.amount,
+      population: mentalHealth.population ?? null,
     },
     {
-      cfda: ['93.959'],
-      program: baseProgram({
-        id: 'substance-abuse',
-        name: 'Substance Abuse Treatment',
-        description: 'Grants for substance abuse prevention and treatment services.',
-        source: 'USASpending.gov — CFDA 93.959 Block Grants for Prevention and Treatment',
+      ...baseProgram({
+        id: 'tb-prevention',
+        name: 'TB Prevention',
+        description: 'Federal grants for tuberculosis prevention and control programs.',
+        source: 'USASpending.gov — CFDA 93.116 Project Grants and Cooperative Agreements for TB',
         geography: 'Attributed to county of the recipient organization.',
-        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.959',
-        noDataReason:
-          "Substance abuse treatment grants are administered by SAMHSA through state behavioral health agencies. County-level data isn't tracked in USASpending.",
-        noDataLink: 'https://www.samhsa.gov/data/',
-        noDataLinkLabel: 'Find behavioral health data at samhsa.gov →',
+        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.116',
       }),
+      amount: tbPrevention.amount,
+      population: tbPrevention.population ?? null,
     },
-  ])
-  return withDataNote(result, healthDataNote(result.total, result.programs))
+    {
+      ...baseProgram({
+        id: 'healthy-start',
+        name: 'Healthy Start',
+        description:
+          'Federal grants to reduce infant mortality and improve maternal and child health.',
+        source: 'USASpending.gov — CFDA 93.926 Healthy Start Initiative',
+        geography: 'Attributed to county of the recipient organization.',
+        sourceUrl: 'https://sam.gov/search?index=cfda&q=93.926',
+      }),
+      amount: healthyStart.amount,
+      population: healthyStart.population ?? null,
+    },
+  ]
+
+  const total = [communityHealth, ryanWhite, immunization, mentalHealth, tbPrevention, healthyStart].reduce(
+    (sum, p) => sum + p.amount,
+    0,
+  )
+
+  return withDataNote({ total, programs }, HEALTH_DATA_NOTE)
 }
 
 export async function fetchInfrastructure(countyFips, stateCode) {

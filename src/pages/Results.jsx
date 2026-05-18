@@ -155,7 +155,7 @@ export default function Results() {
               {!anyLoading && (
                 <>
                   <p className="mt-2 text-base text-ink-light">
-                    in annual federal funding
+                    in direct federal grants to local organizations
                     {perCapita && (
                       <span> · roughly ${perCapita.toLocaleString()} per resident</span>
                     )}
